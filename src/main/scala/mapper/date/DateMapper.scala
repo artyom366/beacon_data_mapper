@@ -45,7 +45,6 @@ object DateMapper {
 
     streamingContext.start()
     streamingContext.awaitTermination()
-
   }
 
   def mapRecord(value: String): Record = {
