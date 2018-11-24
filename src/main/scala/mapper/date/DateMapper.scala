@@ -1,5 +1,6 @@
 package mapper.date
 
+import java.text.SimpleDateFormat
 import java.util.UUID
 
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -35,7 +36,7 @@ object DateMapper {
       record => {
         val key = record.key()
         val value = record.value()
-        mapDate(value)
+        val mappedRecord: Record = mapRecord(value)
       }
     }
 
@@ -44,11 +45,21 @@ object DateMapper {
 
   }
 
-  def mapDate(value: String): Unit = {
+  def mapRecord(value: String): Record = {
     val recordObject = Json.parse(value)
     val record: Record = recordObject.as[Record]
-    print(record.data.time)
+    val location: Location = new Location(record.data.location.latitude, record.data.location.latitude)
+    val data: Data = new Data(record.data.deviceId, record.data.temperature, location, convertDate(record.data.time))
+    new Record(data)
   }
 
+  def convertDate(timeStamp: String): String = {
+    val correctedTimeStamp = correctTimeStamp(timeStamp)
+    val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX")
+    dateFormat.format(correctedTimeStamp)
+  }
 
+  def correctTimeStamp(timeStamp: String): Long = {
+    timeStamp.toLong * 1000L
+  }
 }

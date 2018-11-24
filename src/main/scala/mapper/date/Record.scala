@@ -29,12 +29,3 @@ case class Record(data: Data)
 object Record {
   implicit val recordReads: Reads[Record] = (JsPath \ "data").read[Data].map { data => Record(data) }
 }
-
-//case class Record(data: Data, ss: Option[String])
-//
-//object Record {
-//  implicit val recordReads: Reads[Record] = (
-//    (JsPath \ "data").read[Data] and
-//      (JsPath \ "ss").readNullable[String]
-//    ) (Record.apply _)
-//}
