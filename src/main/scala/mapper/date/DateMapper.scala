@@ -4,10 +4,11 @@ import java.util.UUID
 
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.SparkConf
-import org.apache.spark.streaming.kafka010.{ConsumerStrategies, KafkaUtils, LocationStrategies}
+import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
+import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
+import org.apache.spark.streaming.kafka010._
 import org.apache.spark.streaming.{Seconds, StreamingContext}
-
-import scala.util.parsing.json.JSON
+import play.api.libs.json.Json
 
 object DateMapper {
 
@@ -24,10 +25,9 @@ object DateMapper {
 
     val conf = new SparkConf().setMaster("local[4]").setAppName("NetworkWordCount")
     val streamingContext = new StreamingContext(conf, Seconds(1))
-
     val topics = Array("test1", "test2", "test3")
 
-    val stream = KafkaUtils.createDirectStream(streamingContext, LocationStrategies.PreferConsistent, ConsumerStrategies.Subscribe[String, String](topics, kafkaParams))
+    val stream = KafkaUtils.createDirectStream[String, String](streamingContext, PreferConsistent, Subscribe[String, String](topics, kafkaParams))
 
     stream.print()
 
@@ -45,8 +45,9 @@ object DateMapper {
   }
 
   def mapDate(value: String): Unit = {
-    val record = JSON.parseFull(value)
-    println(record)
+    val recordObject = Json.parse(value)
+    val record: Record = recordObject.as[Record]
+    print(record.data.time)
   }
 
 
