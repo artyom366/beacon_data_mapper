@@ -1,8 +1,11 @@
 package mapper.date
 
+import java.io.PrintWriter
 import java.text.SimpleDateFormat
 import java.util.UUID
 
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
@@ -30,13 +33,12 @@ object DateMapper {
 
     val stream = KafkaUtils.createDirectStream[String, String](streamingContext, PreferConsistent, Subscribe[String, String](topics, kafkaParams))
 
-    stream.print()
-
     stream.map {
       record => {
         val key = record.key()
         val value = record.value()
         val mappedRecord: Record = mapRecord(value)
+        writeDataAsFiles(key, mappedRecord)
       }
     }
 
@@ -61,5 +63,13 @@ object DateMapper {
 
   def correctTimeStamp(timeStamp: String): Long = {
     timeStamp.toLong * 1000L
+  }
+
+  def writeDataAsFiles(fileName: String, record: Record): Unit = {
+    val hadoopConfiguration = new Configuration()
+    val hadoopFileSystem = FileSystem.get(hadoopConfiguration)
+    val outputStream = hadoopFileSystem.create(new Path("hdfs://quickstart.cloudera:8020/user/cloudera/" + fileName))
+    val writer = new PrintWriter(outputStream)
+    writer.write(Record.toString)
   }
 }

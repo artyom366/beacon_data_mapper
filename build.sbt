@@ -1,10 +1,10 @@
-//lazy val root = (project in file(".")).
-//  settings(
-//    name := "data_mapper",
-//    version := "1.0",
-//    scalaVersion := "2.11",
-//    mainClass in Compile := Some("mapper.date.DateMapper")
-//  )
+lazy val root = (project in file(".")).
+  settings(
+    name := "data_mapper",
+    version := "1.0",
+    scalaVersion := "2.11.0",
+    mainClass in Compile := Some("mapper.date.DateMapper")
+  )
 
 name := "beacon_data_mapper"
 version := "1.0"
