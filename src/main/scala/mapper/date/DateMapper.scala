@@ -32,6 +32,7 @@ object DateMapper {
     val topics = Array("test1", "test2", "test3")
 
     val stream = KafkaUtils.createDirectStream[String, String](streamingContext, PreferConsistent, Subscribe[String, String](topics, kafkaParams))
+    stream.print()
 
     stream.map {
       record => {
@@ -68,7 +69,7 @@ object DateMapper {
   def writeDataAsFiles(fileName: String, record: Record): Unit = {
     val hadoopConfiguration = new Configuration()
     val hadoopFileSystem = FileSystem.get(hadoopConfiguration)
-    val outputStream = hadoopFileSystem.create(new Path("hdfs://quickstart.cloudera:8020/user/cloudera/" + fileName))
+    val outputStream = hadoopFileSystem.create(new Path("hdfs://localhost:9000/home/artyom/hdfs_files" + fileName))
     val writer = new PrintWriter(outputStream)
     writer.write(Record.toString)
   }
