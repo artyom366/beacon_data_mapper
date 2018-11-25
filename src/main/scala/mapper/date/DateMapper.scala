@@ -1,11 +1,10 @@
 package mapper.date
 
-import java.io.PrintWriter
 import java.text.SimpleDateFormat
 import java.util.UUID
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.io.Text
+import org.apache.hadoop.mapred.TextOutputFormat
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
@@ -27,32 +26,29 @@ object DateMapper {
       "enable.auto.commit" -> (false: java.lang.Boolean)
     )
 
-    val conf = new SparkConf().setMaster("local[4]").setAppName("NetworkWordCount")
+    val conf = new SparkConf().setMaster("local[4]").setAppName("Beacon Data Mapper")
     val streamingContext = new StreamingContext(conf, Seconds(1))
     val topics = Array("test1", "test2", "test3")
 
     val stream = KafkaUtils.createDirectStream[String, String](streamingContext, PreferConsistent, Subscribe[String, String](topics, kafkaParams))
-    stream.print()
-
-    stream.map {
-      record => {
-        val key = record.key()
-        val value = record.value()
-        val mappedRecord: Record = mapRecord(value)
-        writeDataAsFiles(key, mappedRecord)
-      }
-    }
+    stream
+      .map(record => (record.key, getMappedRecord(record.value)))
+      .saveAsHadoopFiles("hdfs://localhost:9000/home/artyom/hdfs_files/", "txt", classOf[Text], classOf[Text], classOf[TextOutputFormat[String, String]])
 
     streamingContext.start()
     streamingContext.awaitTermination()
   }
 
+  def getMappedRecord(value: String): String = {
+    mapRecord(value).toString
+  }
+
   def mapRecord(value: String): Record = {
     val recordObject = Json.parse(value)
     val record: Record = recordObject.as[Record]
-    val location: Location = new Location(record.data.location.latitude, record.data.location.latitude)
-    val data: Data = new Data(record.data.deviceId, record.data.temperature, location, convertDate(record.data.time))
-    new Record(data)
+    val location: Location = Location(record.data.location.latitude, record.data.location.latitude)
+    val data: Data = Data(record.data.deviceId, record.data.temperature, location, convertDate(record.data.time))
+    Record(data)
   }
 
   def convertDate(timeStamp: String): String = {
@@ -63,13 +59,5 @@ object DateMapper {
 
   def correctTimeStamp(timeStamp: String): Long = {
     timeStamp.toLong * 1000L
-  }
-
-  def writeDataAsFiles(fileName: String, record: Record): Unit = {
-    val hadoopConfiguration = new Configuration()
-    val hadoopFileSystem = FileSystem.get(hadoopConfiguration)
-    val outputStream = hadoopFileSystem.create(new Path("hdfs://localhost:9000/home/artyom/hdfs_files" + fileName))
-    val writer = new PrintWriter(outputStream)
-    writer.write(Record.toString)
   }
 }
