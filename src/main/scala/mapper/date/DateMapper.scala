@@ -3,8 +3,6 @@ package mapper.date
 import java.text.SimpleDateFormat
 import java.util.UUID
 
-import org.apache.hadoop.io.Text
-import org.apache.hadoop.mapred.TextOutputFormat
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
@@ -31,9 +29,11 @@ object DateMapper {
     val topics = Array("test1", "test2", "test3")
 
     val stream = KafkaUtils.createDirectStream[String, String](streamingContext, PreferConsistent, Subscribe[String, String](topics, kafkaParams))
-    stream
-      .map(record => (record.key, getMappedRecord(record.value)))
-      .saveAsHadoopFiles("hdfs://localhost:9000/home/artyom/hdfs_files/", "txt", classOf[Text], classOf[Text], classOf[TextOutputFormat[String, String]])
+
+    stream.foreachRDD(rdd => {
+      if (!rdd.partitions.isEmpty)
+        rdd.map(record => getMappedRecord(record.value())).saveAsTextFile("/home/artyom/hdfs_files/")
+    })
 
     streamingContext.start()
     streamingContext.awaitTermination()
