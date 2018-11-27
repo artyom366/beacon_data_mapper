@@ -3,6 +3,7 @@ package mapper.date
 import java.text.SimpleDateFormat
 import java.util.UUID
 
+import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
@@ -27,20 +28,17 @@ object DateMapper {
     val conf = new SparkConf().setMaster("local[4]").setAppName("Beacon Data Mapper")
     val streamingContext = new StreamingContext(conf, Seconds(1))
     val topics = Array("test1", "test2", "test3")
+    val offsets = Map(new TopicPartition("test1", 0) -> 0L, new TopicPartition("test2", 0) -> 0L, new TopicPartition("test3", 0) -> 0L)
 
-    val stream = KafkaUtils.createDirectStream[String, String](streamingContext, PreferConsistent, Subscribe[String, String](topics, kafkaParams))
+    val stream = KafkaUtils.createDirectStream[String, String](streamingContext, PreferConsistent, Subscribe[String, String](topics, kafkaParams, offsets))
 
     stream.foreachRDD(rdd => {
-      if (!rdd.partitions.isEmpty)
-        rdd.map(record => getMappedRecord(record.value())).saveAsTextFile("/home/artyom/hdfs_files/")
+      if (!rdd.isEmpty())
+        rdd.map(record => mapRecord(record.value())).saveAsTextFile("/home/artyom/hdfs_files/")
     })
 
     streamingContext.start()
     streamingContext.awaitTermination()
-  }
-
-  def getMappedRecord(value: String): String = {
-    mapRecord(value).toString
   }
 
   def mapRecord(value: String): Record = {

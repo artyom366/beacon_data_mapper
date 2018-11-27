@@ -17,9 +17,4 @@ class DateMapper$Test extends FunSuite {
     assert(result.data.location.longitude === "52.14691120000001")
     assert(result.data.time === "2017-11-04T13:00:31+02:00")
   }
-
-  test("Test map date to human readable format with no other changes in String format") {
-    val result: String = DateMapper.getMappedRecord(jsonString)
-    assert(result != null)
-  }
 }
