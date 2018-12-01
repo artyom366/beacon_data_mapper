@@ -3,6 +3,12 @@ package mapper.date
 import java.text.SimpleDateFormat
 import java.util.UUID
 
+import org.apache.hadoop.hbase._
+import org.apache.hadoop.hbase.client.Put
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable
+import org.apache.hadoop.hbase.mapreduce.TableOutputFormat
+import org.apache.hadoop.hbase.util.Bytes
+import org.apache.hadoop.mapreduce.Job
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.spark.SparkConf
@@ -25,8 +31,18 @@ object DateMapper {
       "enable.auto.commit" -> (false: java.lang.Boolean)
     )
 
-    val conf = new SparkConf().setMaster("local[4]").setAppName("Beacon Data Mapper")
-    val streamingContext = new StreamingContext(conf, Seconds(1))
+    val hBaseConf = HBaseConfiguration.create()
+    hBaseConf.set("hbase.zookeeper.quorum", "localhost")
+    hBaseConf.set("hbase.zookeeper.property.clientPort", "2182")
+
+    val hBaseJob = Job.getInstance(hBaseConf)
+    val jobConf = hBaseJob.getConfiguration
+
+    jobConf.set(TableOutputFormat.OUTPUT_TABLE, "record")
+    hBaseJob.setOutputFormatClass(classOf[TableOutputFormat[ImmutableBytesWritable]])
+
+    val sparkConf = new SparkConf().setMaster("local[4]").setAppName("Beacon Data Mapper").set("spark.hbase.host", "localhost")
+    val streamingContext = new StreamingContext(sparkConf, Seconds(1))
     val topics = Array("test1", "test2", "test3")
     val offsets = Map(new TopicPartition("test1", 0) -> 0L, new TopicPartition("test2", 0) -> 0L, new TopicPartition("test3", 0) -> 0L)
 
@@ -34,7 +50,8 @@ object DateMapper {
 
     stream.foreachRDD(rdd => {
       if (!rdd.isEmpty())
-        rdd.map(record => mapRecord(record.value())).saveAsTextFile("/home/artyom/hdfs_files/")
+        rdd.map(record => mapRecord(record.value())).map(record => convertToPut(record)).saveAsNewAPIHadoopDataset(jobConf)
+      //rdd.map(record => mapRecord(record.value())).saveAsTextFile("/home/artyom/hdfs_files/")
     })
 
     streamingContext.start()
@@ -57,5 +74,30 @@ object DateMapper {
 
   def correctTimeStamp(timeStamp: String): Long = {
     timeStamp.toLong * 1000L
+  }
+
+  def convertToPut(record: Record): (ImmutableBytesWritable, Put) = {
+    val uuid: String = UUID.randomUUID().toString
+    val put = new Put(Bytes.toBytes(uuid))
+    put.add(createCell(uuid, String.valueOf(record.data.deviceId), "D", "Id"))
+    put.add(createCell(uuid, String.valueOf(record.data.temperature), "T", "Temp"))
+    put.add(createCell(uuid, String.valueOf(record.data.time), "T", "Time"))
+    put.add(createCell(uuid, String.valueOf(record.data.location.latitude), "L", "Lat"))
+    put.add(createCell(uuid, String.valueOf(record.data.location.longitude), "L", "Lon"))
+    (new ImmutableBytesWritable(Bytes.toBytes(uuid)), put)
+  }
+
+  def createCell(rowId: String, value: String, family: String, qualifier: String): Cell = {
+    createCell(Bytes.toBytes(rowId), Bytes.toBytes(value), Bytes.toBytes(family), Bytes.toBytes(qualifier))
+  }
+
+  def createCell(rowId: Array[Byte], value: Array[Byte], family: Array[Byte], qualifier: Array[Byte]): Cell = {
+    val cellBuilder: CellBuilder = CellBuilderFactory.create(CellBuilderType.SHALLOW_COPY)
+    cellBuilder.setRow(rowId)
+    cellBuilder.setValue(value)
+    cellBuilder.setFamily(family)
+    cellBuilder.setQualifier(qualifier)
+    cellBuilder.setType(Cell.Type.Put)
+    cellBuilder.build()
   }
 }
